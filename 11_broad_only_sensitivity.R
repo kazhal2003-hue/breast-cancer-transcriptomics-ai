@@ -11,6 +11,8 @@
 library(dplyr)
 library(readr)
 
+options(na.print = "NA")
+
 dir.create("results", showWarnings = FALSE, recursive = TRUE)
 
 # 1. Load existing data
@@ -27,7 +29,7 @@ signature_file <-
   "results/subtype_signatures_effect_filtered_top100.csv"
 
 metadata_file <-
-  "results/gdsc2_breast_model_source_metadata.csv"
+  "results/gdsc2_breast_model_sources.csv"
 
 if (!file.exists(tpm_file)) {
   stop("Missing expression file: ", tpm_file)
@@ -80,72 +82,77 @@ if (!all(required_signatures %in% names(signatures))) {
   stop("Signature data are missing required columns.")
 }
 
-# 2. Load or save verified cell-line source metadata
-# The source label must come from verified metadata.
-# It cannot be inferred from gene expression or response values.
 
-if (file.exists(metadata_file)) {
-  
-  matched_metadata <- read_csv(
-    metadata_file,
-    show_col_types = FALSE
-  )
-  
-} else if (exists("matched_metadata", inherits = TRUE)) {
-  
-  matched_metadata <- get("matched_metadata", inherits = TRUE)
-  
-  message(
-    "Saving the verified source metadata from the current R session."
-  )
-  
-  write_csv(
-    as.data.frame(matched_metadata),
-    metadata_file
-  )
-  
-} else {
-  
+# 2. Load and validate verified cell-line source metadata
+
+matched_metadata <- read_csv(
+  metadata_file,
+  show_col_types = FALSE
+)
+
+required_metadata <- c(
+  "model_id",
+  "data_source_matched"
+)
+
+if (!all(required_metadata %in% names(matched_metadata))) {
   stop(
-    "Verified source metadata are unavailable. Restore the previously ",
-    "verified matched_metadata object, or save its model IDs and ",
-    "data_source labels to: ",
-    metadata_file
+    "Source metadata must contain model_id and data_source_matched."
   )
 }
 
-if (!all(c("data_source") %in% names(matched_metadata))) {
-  stop("Source metadata must contain a data_source column.")
-}
-
-# Accept either common model-ID column name.
-if ("model_id" %in% names(matched_metadata)) {
-  metadata_model_ids <- as.character(matched_metadata$model_id)
-} else if ("SANGER_MODEL_ID" %in% names(matched_metadata)) {
-  metadata_model_ids <-
-    as.character(matched_metadata$SANGER_MODEL_ID)
-} else {
-  stop(
-    "Source metadata must contain model_id or SANGER_MODEL_ID."
-  )
-}
-
-matched_metadata <- matched_metadata %>%
+# Check conflicting duplicate IDs before deduplication.
+metadata_check <- matched_metadata %>%
   mutate(
-    model_id = trimws(metadata_model_ids),
-    data_source = trimws(as.character(data_source))
+    model_id = trimws(as.character(model_id)),
+    data_source_matched = trimws(
+      as.character(data_source_matched)
+    )
   ) %>%
+  filter(!is.na(model_id), model_id != "")
+
+metadata_conflicts <- metadata_check %>%
   filter(
-    !is.na(model_id),
-    model_id != "",
-    !is.na(data_source),
-    data_source != ""
+    !is.na(data_source_matched),
+    data_source_matched != ""
   ) %>%
-  distinct(model_id, .keep_all = TRUE)
+  distinct(model_id, data_source_matched) %>%
+  count(model_id, name = "n_sources") %>%
+  filter(n_sources > 1)
+
+if (nrow(metadata_conflicts) > 0) {
+  write_csv(
+    metadata_conflicts,
+    "results/broad_only_metadata_conflicts.csv"
+  )
+  stop(
+    "Conflicting source labels found for duplicate model IDs. ",
+    "See results/broad_only_metadata_conflicts.csv."
+  )
+}
+
+matched_metadata <- metadata_check %>%
+  filter(
+    !is.na(data_source_matched),
+    data_source_matched != ""
+  ) %>%
+  distinct(model_id, .keep_all = TRUE) %>%
+  transmute(
+    model_id,
+    data_source = data_source_matched
+  )
 
 if (anyDuplicated(matched_metadata$model_id)) {
-  stop("Source metadata contain conflicting duplicate model IDs.")
+  stop("Source metadata contain duplicate model IDs.")
 }
+
+cat(
+  "Verified metadata model IDs:",
+  nrow(matched_metadata), "\n"
+)
+
+cat("Source labels:\n")
+print(table(matched_metadata$data_source))
 
 # 3. Identify Broad cell lines
 
