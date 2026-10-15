@@ -1,2 +1,0 @@
-"model","samples_train","samples_test","genes_selected","CV_folds","selected_lambda","test_accuracy","test_balanced_accuracy","test_macro_F1"
-"Multinomial LASSO; fold-specific feature selection",877,218,1000,5,0.00376493580679247,0.908256880733945,0.803329145048256,0.829922647509222
