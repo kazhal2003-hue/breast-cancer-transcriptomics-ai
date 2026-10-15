@@ -1,0 +1,5 @@
+signature,shared_drugs,spearman_ranking_correlation,top10_overlap_count,top10_overlap_percent,direction_comparable_drugs,direction_concordance_percent,significant_in_both,significant_original_only,significant_broad_only,significant_in_neither
+Basal_vs_rest,283,0.935,9,90,283,85.159,14,14,0,255
+Her2_vs_rest,283,0.933,5,50,283,94.346,0,19,0,264
+LumA_vs_rest,283,0.949,7,70,283,90.106,13,2,1,267
+LumB_vs_rest,283,0.935,8,80,283,91.873,17,19,2,245
