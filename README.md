@@ -107,6 +107,38 @@ For reproducibility, the repository should include:
 
 Large raw datasets and temporary intermediate files are not required to be committed to GitHub. Users should obtain source data from their official repositories and follow the documented execution order.
 
+## Results and figures
+
+The selected outputs are organised in the `results/` directory.
+
+### Machine-learning performance
+
+![Subtype classification confusion matrix](results/figure_01_ml_confusion_matrix.png)
+
+![Subtype-level classification performance](results/figure_02_subtype_classification_performance.png)
+
+### Drug-response association landscape
+
+![Subtype signature and drug-response association landscape](results/figure_03_drug_association_landscape.png)
+
+### Downloadable result tables
+
+- [GDSC2 subtype–drug associations](results/gdsc2_subtype_drug_associations.csv)
+- [Drug-ranking robustness across coverage thresholds](results/gdsc2_drug_ranking_robustness.csv)
+- [Agreement between LN_IC50- and AUC-based rankings](results/robustness_LNIC50_vs_AUC_rank_agreement.csv)
+- [Broad-source-only robustness summary](results/broad_only_robustness_summary.csv)
+- [Broad-source-only effect-size robustness](results/broad_only_effect_size_robustness.csv)
+- [Subtype-signature effect-filter summary](results/subtype_signature_effect_filter_summary.csv)
+- [Subtype-signature threshold sensitivity](results/subtype_signature_threshold_sensitivity.csv)
+- [Top 200 signature genes per subtype](results/subtype_signatures_top200_per_subtype.csv)
+- [Cross-validation-safe benchmark metrics](results/ml_subtype_cv_safe_benchmark_metrics.csv)
+- [Cross-validation-safe class-level metrics](results/ml_subtype_cv_safe_class_metrics.csv)
+- [Cross-validation-safe confusion matrix](results/ml_subtype_cv_safe_confusion_matrix.csv)
+- [Cross-validation-safe held-out predictions](results/ml_subtype_cv_safe_predictions.csv)
+- [Genes selected by the cross-validation-safe benchmark](results/ml_subtype_cv_safe_selected_genes.csv)
+
+See [results/README.md](results/README.md) for the results-directory inventory.
+
 ## Limitations
 
 - Transcriptomic profiles from tumour tissue and drug-response measurements from cell lines represent different experimental settings.
