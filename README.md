@@ -1,138 +1,138 @@
-# breast-cancer-transcriptomics-ai
-A reproducible breast cancer transcriptomics and AI-guided drug prioritization project using TCGA-BRCA and GDSC2 data.
 # From Cancer Transcriptomics to AI-Guided Drug Prioritization
 
-An integrative breast cancer transcriptomics and machine-learning project investigating molecular subtypes, gene-expression signatures, and the robustness of computational drug prioritisation using public datasets.
+An integrative computational biology project combining breast cancer transcriptomics, machine-learning classification, molecular expression signatures, and exploratory drug prioritisation using public datasets.
+
+**Author:** Kazhal Ghiasi
 
 ## Overview
 
-Breast cancer comprises molecularly distinct subtypes with different transcriptional profiles and biological characteristics. Understanding these differences can help identify subtype-associated genes, evaluate the predictive value of expression signatures, and explore potential therapeutic hypotheses.
+Breast cancer comprises molecularly distinct subtypes with different transcriptional profiles and biological characteristics. Identifying these patterns can help investigate subtype-associated genes, evaluate machine-learning approaches to molecular classification, and explore hypotheses for therapeutic prioritisation.
 
-This project combines differential gene-expression analysis, machine-learning classification, subtype-signature construction, and drug-response association analysis in a reproducible R-based workflow.
+This project integrates differential gene-expression analysis, multinomial LASSO classification, subtype-signature analysis, and drug-response association testing in an R-based workflow.
 
-Rather than treating drug ranking as an isolated task, the project investigates how molecular subtype information and alternative expression signatures influence computational drug prioritisation, and whether the resulting rankings remain consistent under different analytical assumptions.
+The central objective is to investigate how molecular subtype information and alternative expression signatures influence computational drug prioritisation, and how robust these rankings remain under different analytical assumptions.
 
 ## Research objectives
 
 1. Identify genes differentially expressed between matched breast tumour and normal tissue samples.
 2. Evaluate machine-learning classification of breast cancer molecular subtypes using gene-expression data.
-3. Construct subtype-associated expression signatures and assess their robustness.
-4. Investigate associations between subtype signatures and drug-response measurements in cancer cell lines.
-5. Evaluate the stability of drug rankings across response metrics, data-source restrictions, and sensitivity analyses.
+3. Construct and evaluate subtype-associated expression signatures.
+4. Investigate associations between expression-derived scores and experimental drug-response measurements.
+5. Assess the robustness of drug prioritisation across response metrics, cell-line sources, and analytical thresholds.
 
 ## Data sources
 
-| Dataset | Purpose |
+| Resource | Role in the project |
 |---|---|
-| TCGA-BRCA | Breast cancer tumour and normal tissue gene-expression analysis |
-| PAM50 molecular subtype annotations | Subtype labels for expression analysis and machine-learning classification |
-| GDSC2 | Cancer cell-line drug-response measurements for exploratory drug prioritisation |
-| Broad-source cell-line subset | Sensitivity analysis restricted to a defined cell-line data source |
+| [TCGA-BRCA](https://portal.gdc.cancer.gov/projects/TCGA-BRCA) | Breast cancer transcriptomic data and matched tumour–normal analysis |
+| PAM50 subtype annotations | Molecular subtype labels for classification and signature analyses |
+| [Genomics of Drug Sensitivity in Cancer (GDSC)](https://www.cancerrxgene.org/) | Experimental cell-line drug-response data for exploratory association analysis |
 
-The analyses use publicly available data and derived project-specific files. Original datasets are obtained from their respective repositories, with source information and processing details documented alongside the relevant scripts.
+The project uses public datasets and derived analysis files. Data accessions, source publications, preprocessing decisions, and required inputs should be documented alongside the relevant scripts.
 
 ## Analytical workflow
 
-### 1. Differential gene-expression analysis
+### 1. Paired differential gene-expression analysis
 
-Matched tumour–normal samples are analysed using DESeq2 with a paired design:
+Matched tumour–normal samples are analysed using DESeq2 with the design:
 
 `~ patient + condition`
 
-The analysis accounts for patient-specific differences when estimating tumour-associated expression changes. The resulting differential-expression results provide a biological starting point for downstream investigation.
+This design accounts for patient-specific differences when estimating condition-associated expression changes. The paired analysis uses 113 matched tumour–normal patient pairs.
 
 ### 2. Machine-learning subtype classification
 
-A multinomial LASSO model implemented using `glmnet` classifies samples into PAM50-labelled molecular subtypes using variance-selected gene-expression features.
+A multinomial LASSO model implemented with `glmnet` classifies breast cancer samples into annotated molecular subtypes using gene-expression features.
 
-The benchmark uses:
+The corrected benchmark uses:
 
-- A stratified training/test split of 877 training samples and 218 held-out test samples.
+- 1,095 samples with known subtype labels.
+- A stratified split of 877 training samples and 218 held-out test samples.
 - Five-fold cross-validation within the training cohort.
-- Feature selection performed within each cross-validation fold.
-- Final model evaluation on the held-out test set.
-- Accuracy, balanced accuracy, macro F1, confusion matrices, and subtype-level performance metrics.
+- Selection of the 1,000 most variable genes separately within each cross-validation training fold.
+- Selection of the final gene set using the complete training cohort.
+- Evaluation on the held-out test set using accuracy, balanced accuracy, macro F1, confusion matrices, and subtype-level metrics.
 
-The corrected benchmark is designed to prevent validation-fold samples from influencing feature selection during cross-validation.
+Feature selection is performed within each cross-validation fold to prevent the corresponding validation samples from influencing gene selection. The held-out test set is kept separate from model tuning.
 
 ### 3. Subtype-associated expression signatures
 
-Subtype signatures are constructed and evaluated to investigate molecular differences among breast cancer subtypes. Additional analyses assess the stability of these signatures and the extent to which analytical choices affect downstream findings.
+Expression signatures are constructed and evaluated to investigate molecular differences between breast cancer subtypes. Additional analyses examine how signature-scoring choices influence downstream associations and prioritisation results.
 
 ### 4. Drug-response association and prioritisation
 
-Expression signatures are evaluated against drug-response measurements from GDSC2 cell lines. Drug-level associations are used to explore candidate prioritisation and compare results across molecular subtypes.
+Subtype-associated expression scores are compared with GDSC2 cell-line drug-response measurements to explore candidate drug prioritisation across molecular subtypes.
 
-These analyses assess associations between expression-derived scores and experimental cell-line response measurements. They do not establish clinical treatment efficacy or demonstrate that a model can predict an individual patient's response to therapy.
+These analyses investigate associations between expression-derived scores and experimental response measurements. They are exploratory and do not establish causal mechanisms, clinical treatment efficacy, or individual patient drug-response predictions.
 
 ### 5. Robustness and sensitivity analyses
 
-The project evaluates whether prioritisation results remain consistent when analytical assumptions change, including:
+The project evaluates whether drug-prioritisation results remain consistent under different analytical assumptions, including:
 
 - Minimum cell-line coverage thresholds.
-- Alternative drug-response metrics, including AUC and LN_IC50.
+- Alternative response metrics, including AUC and LN_IC50.
 - Restriction to Broad-source cell lines.
-- Alternative signature-scoring approaches and robustness analyses.
+- Alternative scoring and effect-size robustness analyses.
 
 Ranking correlations, top-ranked candidate overlap, effect sizes, and direction concordance are used to assess the stability of the findings.
 
-## Preliminary machine-learning results
+## Machine-learning benchmark results
 
-The corrected multinomial LASSO benchmark produced the following held-out test results:
+The corrected multinomial LASSO model produced the following held-out test results:
 
 | Metric | Result |
 |---|---:|
-| Test samples | 218 |
+| Training samples | 877 |
+| Held-out test samples | 218 |
 | Selected genes | 1,000 |
 | Accuracy | 90.83% |
 | Balanced accuracy | 80.33% |
 | Macro F1 | 0.830 |
 
-Performance differed across subtypes. Basal and Luminal A samples were classified more consistently, whereas Normal-like classification remained challenging in the held-out test set.
+Performance varied by subtype. Basal and Luminal A samples were classified relatively consistently, while Normal-like classification was more challenging: recall was 37.5% among the eight Normal-like test samples.
 
-These values describe the current benchmark on the specified split. They should be interpreted alongside the confusion matrix, class-level metrics, and limitations associated with the available subtype labels and class sizes.
+These results describe the current benchmark on the specified split. They should be interpreted alongside the confusion matrix, class-level metrics, and class sizes.
 
 ## Reproducibility
 
-The project is organised as a sequence of numbered R scripts. Each script documents its analytical purpose, inputs, outputs, and relevant methodological decisions.
+The repository contains numbered R scripts documenting the project's analytical workflow. Scripts use saved intermediate objects and derived files to avoid unnecessary repetition of computationally expensive steps.
 
-The repository is intended to provide:
+For reproducibility, the repository should include:
 
-- Reproducible analysis scripts.
-- Documentation of data provenance and preprocessing.
-- Selected derived results and figures.
-- Model evaluation and sensitivity-analysis summaries.
-- Information about the R environment and package dependencies.
+- Analysis scripts and their required inputs.
+- Data-source documentation and preprocessing decisions.
+- Selected result tables and figures.
+- Model evaluation and robustness summaries.
+- R and package-version information.
 
-Large raw datasets and temporary intermediate files are not required to be stored in the Git repository. Users should obtain the original datasets from their official sources and follow the documented script order.
+Large raw datasets and temporary intermediate files are not required to be committed to GitHub. Users should obtain source data from their official repositories and follow the documented execution order.
 
 ## Limitations
 
-- Public transcriptomic datasets and cell-line drug-response data represent different experimental settings.
-- Associations between expression signatures and drug response do not establish causality.
-- Cell-line findings cannot be directly interpreted as clinical treatment recommendations.
-- Subtype classification performance depends on the supplied labels, feature-selection procedure, and composition of the evaluation cohort.
-- Results from drug prioritisation depend on data coverage, response metrics, and analytical assumptions.
+- Transcriptomic profiles from tumour tissue and drug-response measurements from cell lines represent different experimental settings.
+- Expression–response associations do not establish causality.
+- Cell-line results cannot be directly interpreted as clinical treatment recommendations.
+- Classification performance depends on subtype labels, the evaluation cohort, and the modelling procedure.
+- Drug prioritisation is sensitive to data coverage, response metrics, and analytical assumptions.
 - Computationally prioritised candidates require independent validation before biological or therapeutic conclusions can be established.
 
 ## Technologies
 
-- **R and RStudio**
-- **DESeq2** — differential gene-expression analysis
-- **glmnet** — regularised multinomial classification
-- **Bioconductor** — transcriptomic data analysis
-- **TCGA-BRCA, PAM50 and GDSC2** — public molecular and drug-response data
-- **Statistical evaluation and sensitivity analysis** — model performance, ranking consistency, and robustness
+- **R and RStudio** — analysis and workflow development.
+- **DESeq2** — differential gene-expression analysis.
+- **glmnet** — regularised multinomial classification.
+- **Bioconductor** — transcriptomic data analysis.
+- **TCGA-BRCA, PAM50 annotations, and GDSC2** — molecular and drug-response data.
+- **Statistical evaluation and sensitivity analysis** — classification performance, ranking stability, and robustness.
 
 ## Project status
 
-The project includes paired differential-expression analysis, subtype-classification benchmarking, expression-signature analyses, drug-response association analyses, and sensitivity analyses. Repository organisation, selected figures, final documentation, and reproducibility checks are being consolidated.
+The 13-script analysis pipeline has been reviewed, and the corrected machine-learning benchmark has been run successfully. Repository documentation, selected result files, figures, and reproducibility metadata are being consolidated for publication.
 
 ## Scope
 
-This is an exploratory computational biology project integrating cancer transcriptomics, machine learning, and expression-informed drug prioritisation. Its purpose is to investigate molecular patterns and the stability of computational findings, not to provide clinical decision support.
+This is an exploratory computational biology project integrating cancer transcriptomics, machine learning, and expression-informed drug prioritisation. It aims to investigate molecular patterns and the robustness of computational findings, rather than provide clinical decision support.
 
 ## Author
 
 **Kazhal Ghiasi**
-
