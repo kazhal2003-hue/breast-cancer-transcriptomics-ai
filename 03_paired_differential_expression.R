@@ -1,229 +1,305 @@
 # Project: From Cancer Transcriptomics to AI-Guided Drug Prioritization
-# Script 03 - paired differential expression
+# Script 03 - paired differential-expression validation
 # Author: Kazhal Ghiasi
-# Purpose: Restore and verify the saved paired DESeq2 analysis.
-# Dataset: TCGA-BRCA; 113 matched tumour-normal patient pairs.
-# This script restores saved objects and performs diagnostic checks.
-# It does not refit the DESeq2 model.
+# Purpose: Validate the existing paired DESeq2 model and saved results.
+#   Expected cohort: 113 patients, one Normal and one Tumour sample each.
+# This script does NOT refit DESeq2 or overwrite the original model
+# or saved differential-expression results.
 
-# 1. Setup 
+# 1. Setup and load existing objects
 
 if (!requireNamespace("DESeq2", quietly = TRUE)) {
-  stop("DESeq2 is required but is not installed.")
+  stop("Package DESeq2 is required.")
 }
 
-dir.create("results", showWarnings = FALSE, recursive = TRUE)
+if (!requireNamespace("SummarizedExperiment", quietly = TRUE)) {
+  stop("Package SummarizedExperiment is required.")
+}
 
 model_file <- "results/deseq2_paired_113.rds"
 results_file <- "results/deseq2_paired_113_results.rds"
 
 if (!file.exists(model_file)) {
-  stop("Saved paired model not found: ", model_file)
+  stop("Saved model not found: ", model_file)
 }
+
 if (!file.exists(results_file)) {
-  stop("Saved paired results not found: ", results_file)
+  stop("Saved results not found: ", results_file)
 }
 
-dds_paired <- readRDS(model_file)
-res_paired <- readRDS(results_file)
+dds <- readRDS(model_file)
+saved_results <- readRDS(results_file)
 
-if (!inherits(dds_paired, "DESeqDataSet")) {
+if (!inherits(dds, "DESeqDataSet")) {
   stop("The saved model is not a DESeqDataSet.")
 }
-if (!inherits(res_paired, "DESeqResults")) {
+
+if (!inherits(saved_results, "DESeqResults")) {
   stop("The saved results are not a DESeqResults object.")
 }
 
-# 2. Verify design and patient pairing 
+# 2. Validate the model design and sample pairing
 
-model_design <- DESeq2::design(dds_paired)
-sample_metadata <- as.data.frame(
-  SummarizedExperiment::colData(dds_paired)
+model_design <- DESeq2::design(dds)
+
+metadata <- as.data.frame(
+  SummarizedExperiment::colData(dds)
 )
 
-if (!all(c("patient", "condition") %in% names(sample_metadata))) {
-  stop("Expected patient and condition columns are missing.")
+required_metadata <- c("patient", "condition")
+
+if (!all(required_metadata %in% names(metadata))) {
+  stop(
+    "Model metadata must contain patient and condition columns."
+  )
 }
 
-pair_table <- with(
-  sample_metadata,
-  table(patient, condition, useNA = "ifany")
+if (anyNA(metadata$patient) || anyNA(metadata$condition)) {
+  stop("Missing patient or condition labels were found.")
+}
+
+metadata$patient <- as.character(metadata$patient)
+metadata$condition <- as.character(metadata$condition)
+
+condition_levels <- sort(unique(metadata$condition))
+
+if (!setequal(condition_levels, c("Normal", "Tumour"))) {
+  stop(
+    "Expected condition labels Normal and Tumour; found: ",
+    paste(condition_levels, collapse = ", ")
+  )
+}
+
+pair_table <- table(
+  patient = metadata$patient,
+  condition = factor(
+    metadata$condition,
+    levels = c("Normal", "Tumour")
+  )
 )
 
-pairing_valid <- (
+pairing_valid <-
+  nrow(pair_table) == 113L &&
   ncol(pair_table) == 2L &&
-    all(rowSums(pair_table) == 2L) &&
-    all(rowSums(pair_table == 1L) == 2L) &&
-    !anyNA(sample_metadata$patient) &&
-    !anyNA(sample_metadata$condition)
+  all(rowSums(pair_table) == 2L) &&
+  all(pair_table[, "Normal"] == 1L) &&
+  all(pair_table[, "Tumour"] == 1L)
+
+design_terms <- attr(
+  terms(model_design),
+  "term.labels"
 )
 
-expected_design <- setequal(
-  attr(terms(model_design), "term.labels"),
+design_valid <- setequal(
+  design_terms,
   c("patient", "condition")
-) && length(attr(terms(model_design), "term.labels")) == 2L
+) && length(design_terms) == 2L
 
-cat("\n=== MODEL DESIGN ===\n")
+cat("\n=== PAIRED MODEL VALIDATION ===\n")
+cat("Model dimensions (genes x samples):\n")
+print(dim(dds))
+
+cat("\nModel design:\n")
 print(model_design)
 
-cat("\n=== MODEL DIMENSIONS (GENES x SAMPLES) ===\n")
-print(dim(dds_paired))
+cat("\nCoefficient names:\n")
+print(DESeq2::resultsNames(dds))
 
-cat("\n=== SAMPLE COUNTS BY CONDITION ===\n")
-print(table(sample_metadata$condition, useNA = "ifany"))
+cat("\nSample counts:\n")
+print(table(metadata$condition))
 
-cat("\n=== PATIENT-LEVEL PAIRING ===\n")
-cat("Unique patients:", length(unique(sample_metadata$patient)), "\n")
-cat("Valid one-normal/one-tumour pairing:", pairing_valid, "\n")
-cat("Expected model design:", expected_design, "\n")
+cat("\nUnique patients:", length(unique(metadata$patient)), "\n")
+cat("Exactly 113 complete pairs:", pairing_valid, "\n")
+cat("Expected paired design:", design_valid, "\n")
 
-write.csv(
-  sample_metadata,
-  "results/paired_sample_metadata.csv",
-  row.names = TRUE
-)
-
-write.csv(
-  as.data.frame(pair_table),
-  "results/paired_patient_condition_table.csv",
-  row.names = FALSE
-)
-
-# 3. Check convergence information, if available 
-
-model_metadata <- S4Vectors::mcols(dds_paired)
-
-if ("betaConv" %in% names(model_metadata)) {
-  beta_conv <- model_metadata$betaConv
-  convergence_failures <- sum(!beta_conv, na.rm = TRUE)
-  convergence_missing <- sum(is.na(beta_conv))
-} else {
-  convergence_failures <- NA_integer_
-  convergence_missing <- NA_integer_
+if (!pairing_valid) {
+  stop(
+    "Pairing validation failed. Inspect the saved sample metadata."
+  )
 }
 
-cat("\n=== CONVERGENCE DIAGNOSTIC ===\n")
-cat("Genes with coefficient convergence failures:",
-    convergence_failures, "\n")
-cat("Genes with unavailable convergence status:",
-    convergence_missing, "\n")
+if (!design_valid) {
+  stop(
+    "The saved model design differs from the expected paired design."
+  )
+}
 
-# 4. Compare the saved results with results extracted from the model 
+# 3. Extract results from the saved model, without refitting
 
-model_results <- tryCatch(
-  DESeq2::results(dds_paired, name = "condition_Tumour_vs_Normal"),
-  error = function(e) NULL
+coefficient_names <- DESeq2::resultsNames(dds)
+
+expected_coefficient <- "condition_Tumour_vs_Normal"
+
+if (!expected_coefficient %in% coefficient_names) {
+  stop(
+    "Expected coefficient not found: ",
+    expected_coefficient,
+    "\nAvailable coefficients: ",
+    paste(coefficient_names, collapse = ", ")
+  )
+}
+
+model_results <- DESeq2::results(
+  dds,
+  name = expected_coefficient
 )
 
-# A coefficient name may differ by factor reference level or naming convention.
-if (is.null(model_results)) {
-  available_coefficients <- tryCatch(
-    DESeq2::resultsNames(dds_paired),
-    error = function(e) character(0)
-  )
-  
-  cat("\nAvailable model coefficients:\n")
-  print(available_coefficients)
-  
-  comparison_status <- paste(
-    "Could not extract results using the expected coefficient name;",
-    "manual coefficient verification is required."
-  )
-  results_match <- NA
-} else {
-  saved_df <- as.data.frame(res_paired)
-  model_df <- as.data.frame(model_results)
-  
-  common_genes <- intersect(rownames(saved_df), rownames(model_df))
-  
-  if (length(common_genes) == 0L) {
-    results_match <- FALSE
-  } else {
-    columns_to_compare <- intersect(
-      c("baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj"),
-      intersect(names(saved_df), names(model_df))
+saved_df <- as.data.frame(saved_results)
+model_df <- as.data.frame(model_results)
+
+saved_gene_ids <- rownames(saved_df)
+model_gene_ids <- rownames(model_df)
+
+if (is.null(saved_gene_ids) || is.null(model_gene_ids)) {
+  stop("Gene identifiers are missing from one or both result objects.")
+}
+
+same_gene_set <- setequal(saved_gene_ids, model_gene_ids)
+
+common_genes <- intersect(saved_gene_ids, model_gene_ids)
+
+columns_to_compare <- intersect(
+  c("baseMean", "log2FoldChange", "lfcSE",
+    "stat", "pvalue", "padj"),
+  intersect(names(saved_df), names(model_df))
+)
+
+if (length(columns_to_compare) == 0L) {
+  stop("No comparable statistical columns were found.")
+}
+
+comparison_by_column <- vapply(
+  columns_to_compare,
+  function(column) {
+    isTRUE(
+      all.equal(
+        saved_df[common_genes, column],
+        model_df[common_genes, column],
+        tolerance = 1e-8,
+        check.attributes = FALSE
+      )
     )
-    
-    results_match <- length(columns_to_compare) > 0L &&
-      all(vapply(columns_to_compare, function(column) {
-        isTRUE(all.equal(
-          saved_df[common_genes, column],
-          model_df[common_genes, column],
-          check.attributes = FALSE
-        ))
-      }, logical(1)))
-  }
-  
-  comparison_status <- if (isTRUE(results_match)) {
-    "Saved results match results extracted from the saved model."
-  } else {
-    "Saved results do not match, or could not be fully matched to, the extracted results. Review required."
-  }
-}
+  },
+  logical(1)
+)
 
-cat("\n=== SAVED RESULTS CHECK ===\n")
-cat("Saved results dimensions:\n")
-print(dim(as.data.frame(res_paired)))
-cat(comparison_status, "\n")
+results_match <-
+  same_gene_set &&
+  length(common_genes) == nrow(saved_df) &&
+  length(common_genes) == nrow(model_df) &&
+  all(comparison_by_column)
 
-# 5. Save results, summaries, and diagnostics 
+cat("\n=== SAVED RESULTS COMPARISON ===\n")
+cat("Saved result dimensions:\n")
+print(dim(saved_df))
 
-res_paired_df <- as.data.frame(res_paired)
-res_paired_df$gene_id <- rownames(res_paired_df)
-res_paired_df <- res_paired_df[
-  c("gene_id", setdiff(names(res_paired_df), "gene_id"))
-]
+cat("\nExtracted result dimensions:\n")
+print(dim(model_df))
 
-write.csv(
-  res_paired_df,
-  "results/deseq2_paired_113_results.csv",
-  row.names = FALSE
+cat("\nSame gene set:", same_gene_set, "\n")
+cat("Genes compared:", length(common_genes), "\n")
+cat("Columns compared:\n")
+print(comparison_by_column)
+
+cat("\nAll saved statistics match:", results_match, "\n")
+
+# 4. Summarise the saved differential-expression results
+
+significant_count <- sum(
+  saved_df$padj < 0.05,
+  na.rm = TRUE
 )
 
 summary_table <- data.frame(
   metric = c(
-    "Number of genes in saved model",
-    "Number of samples in saved model",
-    "Number of unique patients",
-    "Valid patient pairing",
-    "Expected model design",
+    "Genes in saved model",
+    "Samples in saved model",
+    "Unique patients",
+    "Normal samples",
+    "Tumour samples",
+    "Exactly 113 complete pairs",
+    "Expected paired model design",
+    "Genes in saved results",
     "Genes with non-missing adjusted p-values",
-    "Genes with adjusted p-value < 0.05",
-    "Genes with coefficient convergence failures",
-    "Saved results match extracted model results"
+    "Genes with adjusted p-value below 0.05",
+    "Same gene set in saved and extracted results",
+    "All comparable statistics match"
   ),
   value = c(
-    nrow(dds_paired),
-    ncol(dds_paired),
-    length(unique(sample_metadata$patient)),
+    nrow(dds),
+    ncol(dds),
+    length(unique(metadata$patient)),
+    sum(metadata$condition == "Normal"),
+    sum(metadata$condition == "Tumour"),
     pairing_valid,
-    expected_design,
-    sum(!is.na(res_paired$padj)),
-    sum(res_paired$padj < 0.05, na.rm = TRUE),
-    convergence_failures,
+    design_valid,
+    nrow(saved_df),
+    sum(!is.na(saved_df$padj)),
+    significant_count,
+    same_gene_set,
     results_match
-  )
+  ),
+  stringsAsFactors = FALSE
 )
+
+# 5. Write separate diagnostic outputs
 
 write.csv(
   summary_table,
-  "results/paired_deseq2_summary.csv",
+  "results/script03_validation_summary.csv",
   row.names = FALSE
 )
 
-writeLines(
-  c(
-    "Paired DESeq2 diagnostic checkpoint",
-    paste("Model design:", paste(deparse(model_design), collapse = "")),
-    paste("Valid patient pairing:", pairing_valid),
-    paste("Expected model design:", expected_design),
-    paste("Results comparison:", comparison_status),
-    paste("Convergence failures:", convergence_failures),
-    "The model was not refitted by this script."
+write.csv(
+  data.frame(
+    column = names(comparison_by_column),
+    matches = unname(comparison_by_column)
   ),
-  "results/paired_deseq2_checkpoint_notes.txt"
+  "results/script03_result_comparison.csv",
+  row.names = FALSE
+)
+
+write.csv(
+  data.frame(
+    patient = rownames(pair_table),
+    Normal = as.integer(pair_table[, "Normal"]),
+    Tumour = as.integer(pair_table[, "Tumour"]),
+    stringsAsFactors = FALSE
+  ),
+  "results/script03_pairing_audit.csv",
+  row.names = FALSE
+)
+
+report_lines <- c(
+  "Script 03: paired DESeq2 validation",
+  paste("Model file:", model_file),
+  paste("Saved results file:", results_file),
+  paste("Model design:", paste(deparse(model_design), collapse = "")),
+  paste("Genes:", nrow(dds)),
+  paste("Samples:", ncol(dds)),
+  paste("Unique patients:", length(unique(metadata$patient))),
+  paste("Complete 113-pair validation:", pairing_valid),
+  paste("Expected model design:", design_valid),
+  paste("Same gene set:", same_gene_set),
+  paste("Comparable statistics match:", results_match),
+  paste("Genes with adjusted p-value < 0.05:", significant_count),
+  "",
+  "No DESeq2 model refitting was performed.",
+  "Original model and results files were not overwritten."
+)
+
+writeLines(
+  report_lines,
+  "results/script03_validation_notes.txt"
 )
 
 cat("\n=== SCRIPT 03 COMPLETE ===\n")
-cat("Saved model and results restored; no model refitting performed.\n")
-cat("Review results/paired_deseq2_summary.csv and checkpoint notes.\n")
+cat("Validation summary saved to results/script03_validation_summary.csv\n")
+cat("Original model and results remain unchanged.\n")
+
+if (!results_match) {
+  warning(
+    "Saved and extracted results did not fully match. ",
+    "Review script03_result_comparison.csv before interpretation."
+  )
+}
