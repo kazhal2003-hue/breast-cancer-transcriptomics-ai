@@ -1,5 +1,0 @@
-"subtype_comparison","genes_passing_primary_filter","genes_higher_before_top_n","genes_lower_before_top_n","genes_retained_in_compact_signature"
-"Basal_vs_rest",2379,1280,1099,200
-"Her2_vs_rest",697,423,274,200
-"LumA_vs_rest",958,593,365,200
-"LumB_vs_rest",757,264,493,200
