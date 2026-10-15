@@ -1,0 +1,13 @@
+"subtype_comparison","log2FC_threshold","significant_genes","higher_in_subtype","lower_in_subtype"
+"Basal_vs_rest",0.5,7062,3852,3210
+"Basal_vs_rest",1,2379,1280,1099
+"Basal_vs_rest",1.5,1007,492,515
+"Her2_vs_rest",0.5,2851,1597,1254
+"Her2_vs_rest",1,697,423,274
+"Her2_vs_rest",1.5,215,150,65
+"LumA_vs_rest",0.5,4082,2309,1773
+"LumA_vs_rest",1,958,593,365
+"LumA_vs_rest",1.5,304,210,94
+"LumB_vs_rest",0.5,3368,1118,2250
+"LumB_vs_rest",1,757,264,493
+"LumB_vs_rest",1.5,230,88,142
