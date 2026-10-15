@@ -449,14 +449,9 @@ write_csv(
 
 # 6. Print summaries
 
-cat("\n--- Coverage-threshold stability ---\n")
-print(threshold_stability, n = Inf)
-
-cat("\n--- LN_IC50 vs AUC ranking agreement ---\n")
-print(metric_stability, n = Inf)
-
-cat("\n--- Agreement between subtype rankings ---\n")
-print(subtype_stability, n = Inf)
+print(as.data.frame(threshold_stability), row.names = FALSE)
+print(as.data.frame(metric_stability), row.names = FALSE)
+print(as.data.frame(subtype_stability), row.names = FALSE)
 
 cat("\n--- Within-drug LN_IC50 vs AUC agreement ---\n")
 
