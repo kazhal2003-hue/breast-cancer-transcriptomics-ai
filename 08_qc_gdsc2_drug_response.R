@@ -287,24 +287,31 @@ matched_drug_summary <- dplyr::summarise(
     DRUG_ID, DRUG_NAME
   ),
   n_records = dplyr::n(),
-  n_cell_lines = dplyr::n_distinct(SANGER_MODEL_ID, na.rm = TRUE),
+  n_cell_lines = dplyr::n_distinct(
+    SANGER_MODEL_ID[!is.na(SANGER_MODEL_ID) & nzchar(SANGER_MODEL_ID)]
+  ),
+  n_cell_lines_LN_IC50 = dplyr::n_distinct(
+    SANGER_MODEL_ID[
+      !is.na(SANGER_MODEL_ID) &
+        nzchar(SANGER_MODEL_ID) &
+        !is.na(LN_IC50)
+    ]
+  ),
+  n_cell_lines_AUC = dplyr::n_distinct(
+    SANGER_MODEL_ID[
+      !is.na(SANGER_MODEL_ID) &
+        nzchar(SANGER_MODEL_ID) &
+        !is.na(AUC)
+    ]
+  ),
   n_missing_LN_IC50 = sum(is.na(LN_IC50)),
   n_missing_AUC = sum(is.na(AUC)),
   .groups = "drop"
 )
 
-cat("\n=== DRUG COVERAGE: ALL BREAST RESPONSE RECORDS ===\n")
-cat("Drug summary rows:", nrow(drug_summary), "\n")
-cat("\nDrugs tested in the fewest cell lines:\n")
-print(
-  head(drug_summary[order(drug_summary$n_cell_lines), ], 20),
-  row.names = FALSE
-)
-
-cat("\n=== DRUG COVERAGE: MATCHED EXPRESSION MODELS ===\n")
-cat("Drug summary rows:", nrow(matched_drug_summary), "\n")
-
 # 10. Assess prespecified drug coverage thresholds 
+
+coverage_thresholds <- c(15L, 20L, 25L)
 
 coverage_thresholds <- c(15L, 20L, 25L)
 
@@ -313,8 +320,14 @@ threshold_summary <- do.call(
   lapply(coverage_thresholds, function(threshold) {
     data.frame(
       minimum_matched_cell_lines = threshold,
-      drugs_passing_threshold = sum(
+      drugs_with_15_20_25_total_models = sum(
         matched_drug_summary$n_cell_lines >= threshold
+      ),
+      drugs_with_sufficient_LN_IC50 = sum(
+        matched_drug_summary$n_cell_lines_LN_IC50 >= threshold
+      ),
+      drugs_with_sufficient_AUC = sum(
+        matched_drug_summary$n_cell_lines_AUC >= threshold
       )
     )
   })
@@ -325,6 +338,14 @@ print(threshold_summary, row.names = FALSE)
 
 matched_drug_summary$passes_primary_20 <- (
   matched_drug_summary$n_cell_lines >= 20
+)
+
+matched_drug_summary$passes_primary_20_LN_IC50 <- (
+  matched_drug_summary$n_cell_lines_LN_IC50 >= 20
+)
+
+matched_drug_summary$passes_primary_20_AUC <- (
+  matched_drug_summary$n_cell_lines_AUC >= 20
 )
 
 # 11. Save QC outputs 
